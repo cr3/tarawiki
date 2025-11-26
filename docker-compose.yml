@@ -1,0 +1,100 @@
+name: tarawiki
+services:
+  certbot:
+    image: certbot/certbot:v5.1.0
+    volumes:
+      - ./certbot/deploy-hook.sh:/deploy-hook.sh:ro
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/html
+    environment:
+      - SERVER_HOSTNAME=${SERVER_HOSTNAME}
+    networks:
+      network:
+        aliases:
+          - certbot
+    command: >
+      sh -c "trap exit TERM; while :; do
+        certbot renew --webroot --webroot-path=/var/www/html --deploy-hook /deploy-hook.sh;
+        sleep 12h;
+      done"
+    entrypoint: ""
+    restart: always
+    healthcheck:
+      test: [ "CMD", "test", "-e", "/etc/letsencrypt/live/fullchain.pem" ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  mediawiki:
+    build: mediawiki
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./mediawiki/LocalSettings.php:/var/www/html/LocalSettings.php
+      - ./mediawiki/logo.svg:/var/www/html/resources/assets/logo.svg:ro
+      - ./mediawiki/000-default.template:/etc/apache2/sites-available/000-default.template
+      - mediawiki-images-1:/var/www/html/images
+      - certbot-certs:/etc/letsencrypt:ro,z
+    environment:
+      SERVER_HOSTNAME: ${SERVER_HOSTNAME}
+      MEDIAWIKI_DB_HOST: mysql
+      MEDIAWIKI_DB_USER: ${DBUSER}
+      MEDIAWIKI_DB_PASSWORD: ${DBPASS}
+      MEDIAWIKI_DB_NAME: ${DBNAME}
+    networks:
+      network:
+        ipv4_address: ${IPV4_NETWORK:-172.22.1}.240
+        aliases:
+          - mediawiki
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "php -r '$$c = @fsockopen(\"localhost\", 80); if (is_resource($$c)) { fwrite(STDOUT, \"OK\"); fclose($$c); exit(0); } else { fwrite(STDERR, \"FAIL\"); exit(1); }'" ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mysql:
+    image: mariadb:10.11
+    volumes:
+      - ./mysql/conf.d/:/etc/mysql/conf.d/:ro,Z
+      - mysql-vol-1:/var/lib/mysql/
+      - mysql-socket-vol-1:/run/mysqld/
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DBROOT}
+      - MYSQL_DATABASE=${DBNAME}
+      - MYSQL_USER=${DBUSER}
+      - MYSQL_PASSWORD=${DBPASS}
+      - MYSQL_INITDB_SKIP_TZINFO=1
+    networks:
+      network:
+        aliases:
+          - mysql
+    restart: always
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    user: mysql
+    stop_grace_period: 45s
+
+networks:
+  network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-tarawiki
+    ipam:
+      driver: default
+      config:
+        - subnet: ${IPV4_NETWORK:-172.22.1}.0/24
+
+volumes:
+  certbot-certs:
+  certbot-www:
+  mysql-vol-1:
+  mysql-socket-vol-1:
+  mediawiki-images-1:

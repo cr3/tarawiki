@@ -1,0 +1,14 @@
+<VirtualHost *:80>
+    ServerName ${SERVER_HOSTNAME}
+    Redirect permanent / https://${SERVER_HOSTNAME}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${SERVER_HOSTNAME}
+
+    DocumentRoot /var/www/html
+
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/privkey.pem
+</VirtualHost>
