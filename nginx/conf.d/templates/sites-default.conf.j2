@@ -41,8 +41,8 @@ location ~ ^/(fonts|js|css|img)/ {
     add_header Cache-Control public;
 }
 
-error_log  /var/log/nginx/error.log;
 access_log /var/log/nginx/access.log;
+error_log  /var/log/nginx/error.log;
 fastcgi_hide_header X-Powered-By;
 absolute_redirect off;
 root /var/www/html;
@@ -64,17 +64,51 @@ location / {
     try_files $uri $uri/ /index.php?$query_string;
 }
 
+location ~* ^/(resources|skins|extensions)/.+\.(js|css|png|jpg|jpeg|gif|ico|svg|webp|woff|woff2|ttf|eot)$ {
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+    log_not_found off;
+    access_log off;
+}
+
 location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|webp)$ {
     try_files $uri /index.php?$query_string;
     expires max;
     log_not_found off;
 }
 
+location ~ ^/(cache|deleted|maintenance|languages|serialized)/ {
+    deny all;
+}
+
+location ~ /(LocalSettings\.php|AdminSettings\.php) {
+    deny all;
+}
+
 location ~ \.php$ {
+    access_log /var/log/nginx/php-access.log;
+    error_log  /var/log/nginx/php-error.log;
+
+    try_files $uri =404;
+
     include fastcgi_params;
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     fastcgi_index index.php;
     fastcgi_pass mediawiki:9000;
+
+    fastcgi_keep_conn on;
+
+    fastcgi_buffers 16 16k;
+    fastcgi_buffer_size 32k;
+    fastcgi_busy_buffers_size 64k;
+    fastcgi_read_timeout 300s;
+    fastcgi_send_timeout 300s;
+
+    fastcgi_cache fastcgi;
+    fastcgi_cache_key "$scheme$request_method$host$request_uri";
+    fastcgi_cache_valid 200 60m;
+    fastcgi_cache_bypass $http_pragma $http_authorization $cookie_wikiUserID $cookie_wikiUserName;
+    fastcgi_no_cache $http_pragma $http_authorization $cookie_wikiUserID $cookie_wikiUserName;
 }
 
 include /etc/nginx/conf.d/site.*.custom;

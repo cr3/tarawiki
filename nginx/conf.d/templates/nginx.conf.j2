@@ -32,7 +32,8 @@ http {
     map_hash_bucket_size 256;
 
     # site.conf:
-    proxy_cache_path /tmp levels=1:2 keys_zone=sogo:10m inactive=24h  max_size=1g;
+    fastcgi_cache_path /tmp/nginx_fastcgi levels=1:2 keys_zone=fastcgi:10m inactive=60m max_size=512m;
+
     server_names_hash_max_size 512;
     server_names_hash_bucket_size 128;
 
