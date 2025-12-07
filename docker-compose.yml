@@ -45,6 +45,15 @@ services:
       timeout: 5s
       retries: 3
 
+  mediawiki-exporter:
+    build: mediawiki_exporter
+    depends_on:
+      mediawiki:
+        condition: service_healthy
+    environment:
+      - MEDIAWIKI_API_URL=http://nginx
+    restart: always
+
   mysql:
     image: mariadb:10.11
     volumes:
