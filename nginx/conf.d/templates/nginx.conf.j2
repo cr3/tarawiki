@@ -42,6 +42,11 @@ http {
         https https;
     }
 
+    map $http_user_agent $should_redirect {
+        default 1;
+        "~*mediawiki-exporter" 0;
+    }
+
     server {
         listen 80 default_server;
         listen [::]:80 default_server;
@@ -52,8 +57,12 @@ http {
         location ^~ /.well-known/acme-challenge/ {
             root /var/www/certbot;
         }
+
         location / {
-            return 301 https://$host$uri$is_args$args;
+            if ($should_redirect = 1) {
+                return 301 https://$host$uri$is_args$args;
+            }
+            try_files $uri $uri/ =404;
         }
     }
 
@@ -69,7 +78,7 @@ http {
 
         server_name {{ SERVER_HOSTNAME }};
 
-	include /etc/nginx/includes/sites-default.conf;
+        include /etc/nginx/includes/sites-default.conf;
     }
 
     # Additional Server Names

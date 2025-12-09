@@ -1,5 +1,11 @@
 name: tarawiki
 services:
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    volumes:
+      - ./blackbox_exporter/config.yml:/etc/blackbox_exporter/config.yml
+    restart: always
+
   certbot:
     image: certbot/certbot:v5.2.1
     volumes:
@@ -23,23 +29,29 @@ services:
       retries: 15
 
   mediawiki:
-    image: mediawiki:1.44.2-fpm-alpine
+    build: mediawiki
     depends_on:
       mysql:
         condition: service_healthy
     volumes:
       - certbot-certs:/etc/letsencrypt:ro
       - mediawiki-html-1:/var/www/html
-      - ./mediawiki/LocalSettings.php:/var/www/html/LocalSettings.php
     environment:
-      SERVER_HOSTNAME: ${SERVER_HOSTNAME}
-      MEDIAWIKI_DB_HOST: mysql
-      MEDIAWIKI_DB_USER: ${DBUSER}
-      MEDIAWIKI_DB_PASSWORD: ${DBPASS}
-      MEDIAWIKI_DB_NAME: ${DBNAME}
+      MW_DB_TYPE: mysql
+      MW_DB_HOST: mysql
+      MW_DB_USER: ${DBUSER}
+      MW_DB_PASSWORD: ${DBPASS}
+      MW_DB_NAME: ${DBNAME}
+      MW_SERVER: https://${SERVER_HOSTNAME}
+      MW_SITE_LANG: ${MW_SITE_LANG:-en}
+      MW_SITE_NAME: ${MW_SITE_NAME:-MediaWiki}
+      MW_ADMIN_USER: ${MW_ADMIN_USER:-admin}
+      MW_ADMIN_EMAIL: ${MW_ADMIN_EMAIL}
+      MW_ADMIN_PASS: ${MW_ADMIN_PASS}
+    command: php-fpm
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "php -r '$$c = @fsockopen(\"localhost\", 9000); if (is_resource($$c)) { fwrite(STDOUT, \"OK\"); fclose($$c); exit(0); } else { fwrite(STDERR, \"FAIL\"); exit(1); }'" ]
+      test: [ "CMD-SHELL", "php -r '$$c = @fsockopen(\"localhost\", 9000); if (is_resource($$c)) { fclose($$c); exit(0); } else { exit(1); }'" ]
       start_period: 10s
       interval: 10s
       timeout: 5s
@@ -51,7 +63,7 @@ services:
       mediawiki:
         condition: service_healthy
     environment:
-      - MEDIAWIKI_API_URL=http://nginx
+      - MEDIAWIKI_API_URL=http://nginx/api.php
     restart: always
 
   mysql:
@@ -75,6 +87,16 @@ services:
       retries: 3
     user: mysql
     stop_grace_period: 45s
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.18.0
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command:
+      - '--mysqld.username=root:${DBROOT}'
+      - '--mysqld.address=mysql:3306'
+    restart: always
 
   nginx:
     build: nginx
@@ -101,6 +123,28 @@ services:
         ipv4_address: ${IPV4_NETWORK:-172.22.1}.240
     restart: always
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.5.1
+    depends_on:
+      nginx:
+        condition: service_started
+    command:
+      - '-nginx.scrape-uri=http://nginx:80/nginx_status'
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:v3.8.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+    restart: always
+
 networks:
   default:
     driver: bridge
@@ -117,3 +161,4 @@ volumes:
   mediawiki-html-1:
   mysql-vol-1:
   mysql-socket-vol-1:
+  prometheus-data:
