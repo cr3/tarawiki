@@ -7,7 +7,7 @@ services:
     restart: always
 
   certbot:
-    image: certbot/certbot:v5.2.1
+    image: certbot/certbot:v5.2.2
     volumes:
       - ./certbot/deploy-hook.sh:/deploy-hook.sh:ro,Z
       - certbot-certs:/etc/letsencrypt
