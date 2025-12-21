@@ -72,10 +72,10 @@ services:
   mediawiki-exporter:
     build: mediawiki_exporter
     depends_on:
-      mediawiki:
-        condition: service_healthy
+      nginx:
+        condition: service_started
     environment:
-      - MEDIAWIKI_API_URL=http://tarawiki-nginx/api.php
+      - MEDIAWIKI_API_URL=https://wiki.taram.ca/api.php
     networks:
       default:
         aliases:
@@ -134,7 +134,6 @@ services:
       - certbot-certs:/etc/letsencrypt:ro
       - mediawiki-html-1:/var/www/html:ro
       - ./nginx/conf.d/:/etc/nginx/conf.d/:Z
-      - ./nginx/assets/logo.svg:/var/www/html/resources/assets/logo.svg:ro,Z
     environment:
       - SERVER_HOSTNAME=${SERVER_HOSTNAME}
       - ADDITIONAL_SERVER_NAMES=${ADDITIONAL_SERVER_NAMES:-}
