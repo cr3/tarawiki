@@ -4,6 +4,10 @@ services:
     image: prom/blackbox-exporter:v0.28.0
     volumes:
       - ./blackbox_exporter/config.yml:/etc/blackbox_exporter/config.yml
+    networks:
+      default:
+        aliases:
+          - tarawiki-blackbox-exporter
     restart: always
 
   certbot:
@@ -14,6 +18,10 @@ services:
       - certbot-www:/var/www/html
     environment:
       - SERVER_HOSTNAME=${SERVER_HOSTNAME}
+    networks:
+      default:
+        aliases:
+          - tarawiki-certbot
     command: >
       sh -c "trap exit TERM; while :; do
         certbot renew --webroot --webroot-path=/var/www/html --deploy-hook /deploy-hook.sh;
@@ -48,6 +56,10 @@ services:
       MW_ADMIN_USER: ${MW_ADMIN_USER:-admin}
       MW_ADMIN_EMAIL: ${MW_ADMIN_EMAIL}
       MW_ADMIN_PASS: ${MW_ADMIN_PASS}
+    networks:
+      default:
+        aliases:
+          - tarawiki-mediawiki
     command: php-fpm
     restart: unless-stopped
     healthcheck:
@@ -63,7 +75,11 @@ services:
       mediawiki:
         condition: service_healthy
     environment:
-      - MEDIAWIKI_API_URL=http://nginx/api.php
+      - MEDIAWIKI_API_URL=http://tarawiki-nginx/api.php
+    networks:
+      default:
+        aliases:
+          - tarawiki-mediawiki-exporter
     restart: always
 
   mysql:
@@ -78,6 +94,10 @@ services:
       - MYSQL_USER=${DBUSER}
       - MYSQL_PASSWORD=${DBPASS}
       - MYSQL_INITDB_SKIP_TZINFO=1
+    networks:
+      default:
+        aliases:
+          - tarawiki-mysql
     restart: always
     healthcheck:
       test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
@@ -93,6 +113,10 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - tarawiki-mysqld-exporter
     command:
       - '--mysqld.username=root:${DBROOT}'
       - '--mysqld.address=mysql:3306'
@@ -121,6 +145,8 @@ services:
     networks:
       default:
         ipv4_address: ${IPV4_NETWORK:-172.22.1}.240
+        aliases:
+          - tarawiki-nginx
     restart: always
 
   nginx-exporter:
@@ -128,8 +154,12 @@ services:
     depends_on:
       nginx:
         condition: service_started
+    networks:
+      default:
+        aliases:
+          - tarawiki-nginx-exporter
     command:
-      - '-nginx.scrape-uri=http://nginx:80/nginx_status'
+      - '-nginx.scrape-uri=http://tarawiki-nginx/nginx_status'
     restart: always
 
   prometheus:
@@ -137,6 +167,10 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    networks:
+      default:
+        aliases:
+          - tarawiki-prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
