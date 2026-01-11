@@ -44,6 +44,7 @@ services:
     volumes:
       - certbot-certs:/etc/letsencrypt:ro
       - mediawiki-html-1:/var/www/html
+      - ./mediawiki/extensions/VisualEditor:/var/www/html/extensions/VisualEditor
     environment:
       MW_DB_TYPE: mysql
       MW_DB_HOST: mysql

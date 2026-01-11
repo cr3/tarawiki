@@ -1,3 +1,7 @@
 [submodule "mediawiki_exporter"]
 	path = mediawiki_exporter
 	url = git@github.com:cr3/mediawiki_exporter.git
+[submodule "mediawiki/extensions/VisualEditor"]
+	path = mediawiki/extensions/VisualEditor
+	url = https://gerrit.wikimedia.org/r/mediawiki/extensions/VisualEditor
+	branch = REL1_44
