@@ -1,0 +1,2 @@
+<?php
+$wgDefaultSkin = "timeless";

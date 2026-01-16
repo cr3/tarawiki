@@ -69,15 +69,20 @@ location /nginx_status {
     deny all;
 }
 
-location / {
-    try_files $uri $uri/ /index.php?$query_string;
+location /assets/ {
+    alias /var/www/html/assets/;
+    access_log off;
+    expires 30d;
+    add_header Cache-Control "public";
 }
 
-location ~* ^/(resources|skins|extensions)/.+\.(js|css|png|jpg|jpeg|gif|ico|svg|webp|woff|woff2|ttf|eot)$ {
-    expires 30d;
-    add_header Cache-Control "public, immutable";
-    log_not_found off;
-    access_log off;
+location / {
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME /var/www/html/index.php;
+    fastcgi_param SCRIPT_NAME /index.php;
+    fastcgi_param PATH_INFO $uri;
+    fastcgi_param QUERY_STRING $query_string;
+    fastcgi_pass tarawiki-mediawiki:9000;
 }
 
 location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|webp)$ {
@@ -98,10 +103,8 @@ location ~ \.php$ {
     access_log /var/log/nginx/php-access.log;
     error_log  /var/log/nginx/php-error.log;
 
-    try_files $uri =404;
-
     include fastcgi_params;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
     fastcgi_index index.php;
     fastcgi_pass tarawiki-mediawiki:9000;
 

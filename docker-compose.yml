@@ -39,24 +39,17 @@ services:
   mediawiki:
     build: mediawiki
     depends_on:
+      mediawiki-init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
     volumes:
-      - certbot-certs:/etc/letsencrypt:ro
-      - mediawiki-html-1:/var/www/html
-      - ./mediawiki/extensions/VisualEditor:/var/www/html/extensions/VisualEditor
+      - mediawiki-config:/config:ro
+      - mediawiki-images:/var/www/html/images
+      - ./mediawiki/LocalSettings.d:/var/www/html/LocalSettings.d:ro,Z
+      - ./mediawiki/extensions/VisualEditor:/var/www/html/extensions/VisualEditor:ro,Z
     environment:
-      MW_DB_TYPE: mysql
-      MW_DB_HOST: mysql
-      MW_DB_USER: ${DBUSER}
-      MW_DB_PASSWORD: ${DBPASS}
-      MW_DB_NAME: ${DBNAME}
-      MW_SERVER: https://${SERVER_HOSTNAME}
-      MW_SITE_LANG: ${MW_SITE_LANG:-en}
-      MW_SITE_NAME: ${MW_SITE_NAME:-MediaWiki}
-      MW_ADMIN_USER: ${MW_ADMIN_USER:-admin}
-      MW_ADMIN_EMAIL: ${MW_ADMIN_EMAIL}
-      MW_ADMIN_PASS: ${MW_ADMIN_PASS}
+      MW_CONFIG_DIR: /config
     networks:
       default:
         aliases:
@@ -83,17 +76,47 @@ services:
           - tarawiki-mediawiki-exporter
     restart: always
 
+  mediawiki-init:
+    build: mediawiki
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - mediawiki-config:/config
+      - ./mediawiki/init.sh:/init.sh:ro,Z
+    secrets:
+      - dbpass
+      - mw_admin_pass
+    environment:
+      MW_CONFIG_DIR: /config
+      MW_DB_TYPE: mysql
+      MW_DB_HOST: mysql
+      MW_DB_USER: ${DBUSER}
+      MW_DB_PASS_FILE: /run/secrets/dbpass
+      MW_DB_NAME: ${DBNAME}
+      MW_SERVER: https://${SERVER_HOSTNAME}
+      MW_SITE_LANG: ${MW_SITE_LANG:-en}
+      MW_SITE_NAME: ${MW_SITE_NAME:-MediaWiki}
+      MW_ADMIN_USER: ${MW_ADMIN_USER:-admin}
+      MW_ADMIN_PASS_FILE: /run/secrets/mw_admin_pass
+      MW_ADMIN_EMAIL: ${MW_ADMIN_EMAIL}
+    command: /init.sh
+    entrypoint: [ "sh", "-ec" ]
+    restart: "no"
+
   mysql:
     image: mariadb:12.1
     volumes:
       - ./mysql/conf.d/:/etc/mysql/conf.d/:ro,Z
       - mysql-vol-1:/var/lib/mysql/
       - mysql-socket-vol-1:/run/mysqld/
+    secrets:
+      - dbpass
     environment:
       - MYSQL_ROOT_PASSWORD=${DBROOT}
       - MYSQL_DATABASE=${DBNAME}
       - MYSQL_USER=${DBUSER}
-      - MYSQL_PASSWORD=${DBPASS}
+      - MYSQL_PASSWORD_FILE=/run/secrets/dbpass
       - MYSQL_INITDB_SKIP_TZINFO=1
     networks:
       default:
@@ -133,7 +156,7 @@ services:
     volumes:
       - certbot-www:/web:ro
       - certbot-certs:/etc/letsencrypt:ro
-      - mediawiki-html-1:/var/www/html:ro
+      - ./mediawiki/assets:/var/www/html/assets:ro
       - ./nginx/conf.d/:/etc/nginx/conf.d/:Z
     environment:
       - SERVER_HOSTNAME=${SERVER_HOSTNAME}
@@ -192,7 +215,14 @@ networks:
 volumes:
   certbot-certs:
   certbot-www:
-  mediawiki-html-1:
+  mediawiki-config:
+  mediawiki-images:
   mysql-vol-1:
   mysql-socket-vol-1:
   prometheus-data:
+
+secrets:
+  dbpass:
+    environment: DBPASS
+  mw_admin_pass:
+    environment: MW_ADMIN_PASS
