@@ -5,3 +5,6 @@
 	path = mediawiki/extensions/VisualEditor
 	url = https://gerrit.wikimedia.org/r/mediawiki/extensions/VisualEditor
 	branch = REL1_44
+[submodule "taracert"]
+	path = taracert
+	url = git@github.com:cr3/taracert.git
